@@ -112,6 +112,7 @@
 
                 <div class="text-center text-sm text-slate-600">
                     &copy; {{ date('Y') }} Pondok Pesantren Kun Karima. All rights reserved.
+                    <p class="mt-1 text-slate-600">Created by Ahmad Adnan</p>
                 </div>
             </div>
         </div>

@@ -47,6 +47,20 @@
             @endif
         </div>
 
+        <div class="mt-6">
+                <x-input-label for="password" value="{{ __('Password') }}" class="sr-only" />
+
+                <x-text-input
+                    id="password"
+                    name="password"
+                    type="password"
+                    class="mt-1 block w-3/4 focus:ring-red-600 focus:border-red-600"
+                    placeholder="{{ __('Password Baru') }}"
+                />
+
+                <x-input-error :messages="$errors->userDeletion->get('password')" class="mt-2" />
+            </div>
+
         <div class="flex items-center gap-4">
             <button type="submit" class="inline-flex items-center justify-center rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-600">
                 {{ __('Simpan') }}

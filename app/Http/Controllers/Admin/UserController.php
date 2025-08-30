@@ -17,7 +17,7 @@ class UserController extends Controller
     {
         $this->authorize('viewAny', User::class);
         // Ambil semua user kecuali admin yang sedang login
-        $users = User::where('id', '!=', auth()->id())->latest()->paginate(10);
+        $users = User::where('id', '!=', auth()->id())->latest()->paginate(1000);
         return view('admin.users.index', compact('users'));
     }
 

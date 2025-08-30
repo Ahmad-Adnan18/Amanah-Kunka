@@ -3,7 +3,6 @@
         <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             <div class="space-y-8">
 
-                <!-- Header Halaman -->
                 <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
                     <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                         <div>
@@ -17,7 +16,6 @@
                     </div>
                 </div>
 
-                <!-- Notifikasi Sukses -->
                 @if (session('success'))
                     <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)" x-transition
                          class="bg-green-100 border border-green-200 text-green-800 px-4 py-3 rounded-2xl shadow-sm flex justify-between items-center" role="alert">
@@ -26,8 +24,47 @@
                     </div>
                 @endif
 
-                <!-- Tabel User -->
-                <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+                <div class="space-y-4 md:hidden">
+                    @forelse ($users as $user)
+                        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-4">
+                            <div class="flex justify-between items-start gap-4">
+                                <div class="flex-1">
+                                    <p class="font-semibold text-slate-900">{{ $user->name }}</p>
+                                    <p class="text-sm text-slate-500 mt-1">{{ $user->email }}</p>
+                                    <div class="mt-3">
+                                        @php
+                                            $roleClass = match($user->role) {
+                                                'admin' => 'bg-red-50 text-red-700 ring-red-600/20',
+                                                'wali_santri' => 'bg-amber-50 text-amber-700 ring-amber-600/20',
+                                                'pengajaran' => 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                                                'keasramaan' => 'bg-green-50 text-green-700 ring-green-600/20',
+                                                default => 'bg-slate-50 text-slate-600 ring-slate-500/20',
+                                            };
+                                        @endphp
+                                        <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset {{ $roleClass }}">
+                                            {{ ucwords(str_replace('_', ' ', $user->role)) }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col items-end space-y-2 flex-shrink-0">
+                                    <a href="{{ route('admin.users.edit', $user) }}" class="text-sm font-medium text-slate-600 hover:text-red-700 px-2 py-1">Edit</a>
+                                    @if(Auth::id() !== $user->id)
+                                    <form action="{{ route('admin.users.destroy', $user) }}" method="POST" class="inline" onsubmit="return confirm('Yakin ingin menghapus user ini?')">
+                                        @csrf @method('DELETE')
+                                        <button type="submit" class="text-sm font-medium text-red-600 hover:text-red-900 px-2 py-1">Hapus</button>
+                                    </form>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center text-slate-500">
+                            <p>Tidak ada data user.</p>
+                        </div>
+                    @endforelse
+                </div>
+
+                <div class="hidden md:block bg-white rounded-2xl shadow-lg border border-slate-200 overflow-x-auto">
                     <table class="min-w-full divide-y divide-slate-200">
                         <thead class="bg-slate-50">
                             <tr>
@@ -72,6 +109,7 @@
                         </tbody>
                     </table>
                 </div>
+
             </div>
         </div>
     </div>

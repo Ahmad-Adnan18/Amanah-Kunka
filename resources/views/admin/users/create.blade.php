@@ -45,7 +45,7 @@
                                 <select name="role" id="role" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500">
                                     <option value="ustadz_umum">Ustadz Umum</option>
                                     <option value="pengajaran">Pengajaran</option>
-                                    <option value="keasramaan">Keasramaan</option>
+                                    <option value="pengasuhan">pengasuhan</option>
                                     <option value="kesehatan">Kesehatan</option>
                                     <option value="admin">Admin</option>
                                     <option value="wali_santri">Wali Santri</option>
