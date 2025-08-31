@@ -13,6 +13,8 @@ class MataPelajaran extends Model
     protected $fillable = [
         'nama_pelajaran',
         'kategori',
+        'duration_jp',
+        'requires_special_room',
     ];
 
     public function kelas(): BelongsToMany
@@ -24,4 +26,10 @@ class MataPelajaran extends Model
     {
         return $this->belongsToMany(KurikulumTemplate::class, 'kurikulum_template_mata_pelajaran');
     }
+
+    public function teachers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'mata_pelajaran_user');
+    }
 }
+

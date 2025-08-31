@@ -19,6 +19,12 @@ use App\Http\Controllers\Keasramaan\PrestasiController;
 use App\Http\Controllers\Akademik\PlacementController;
 use App\Http\Controllers\Admin\SantriManagementController;
 use App\Http\Controllers\Akademik\KurikulumController;
+use App\Http\Controllers\Admin\MasterData\RoomController;
+use App\Http\Controllers\Admin\MasterData\TeacherAvailabilityController;
+use App\Http\Controllers\Admin\Configuration\RuleController;
+use App\Http\Controllers\Admin\Scheduling\ScheduleGeneratorController;
+use App\Http\Controllers\Admin\Scheduling\ScheduleViewController;
+use App\Http\Controllers\PublicScheduleController;
 
 
 
@@ -43,50 +49,59 @@ Route::middleware('auth')->group(function () {
     Route::get('/santri/{santri}/profil/rapor/export', [SantriProfileController::class, 'exportRapor'])->name('santri.profil.rapor.export');
     // RUTE BARU UNTUK EXPORT PDF
     Route::get('/santri/{santri}/profil/rapor/export-pdf', [SantriProfileController::class, 'exportRaporPdf'])->name('santri.profil.rapor.export.pdf');
+    // Rute untuk melihat jadwal publik (per kelas/guru)
+    Route::get('/jadwal', [\App\Http\Controllers\PublicScheduleController::class, 'index'])->name('jadwal.public.index');
 
     // --- GRUP RUTE PENGELOLAAN PENGAJARAN ---
     Route::prefix('pengajaran')->name('pengajaran.')->group(function () {
-        // Rute untuk Data Master Kelas
+        // ... (semua route pengajaran Anda tetap di sini) ...
         Route::resource('kelas', KelasController::class)->except(['show']);
-
-        // Rute untuk mengelola Santri di dalam Kelas
         Route::get('kelas/{kelas}/santri', [SantriController::class, 'index'])->name('santris.index');
         Route::get('kelas/{kelas}/santri/create', [SantriController::class, 'create'])->name('santris.create');
         Route::post('santri', [SantriController::class, 'store'])->name('santris.store');
         Route::get('santri/{santri}/edit', [SantriController::class, 'edit'])->name('santris.edit');
         Route::put('santri/{santri}', [SantriController::class, 'update'])->name('santris.update');
         Route::delete('santri/{santri}', [SantriController::class, 'destroy'])->name('santris.destroy');
-        // RUTE BARU UNTUK MENGAMBIL DATA SANTRI VIA JSON
         Route::get('kelas/{kelas}/santri-json', [KelasController::class, 'getSantrisJson'])->name('kelas.santris.json');
         Route::resource('mata-pelajaran', MataPelajaranController::class)->except(['show']);
-        // RUTE BARU UNTUK KODE WALI
         Route::post('generate-all-wali-codes', [KelasController::class, 'generateAllWaliCodes'])->name('kelas.generate_all_wali_codes');
         Route::get('export-wali-codes', [KelasController::class, 'exportWaliCodes'])->name('kelas.export_wali_codes');
         Route::resource('jabatan', JabatanController::class)->except(['show']);
-        // RUTE BARU UNTUK PENUNJUKAN JABATAN
         Route::post('kelas/{kelas}/assign-jabatan', [KelasController::class, 'assignJabatan'])->name('kelas.assign_jabatan');
         Route::delete('remove-jabatan/{jabatanUser}', [KelasController::class, 'removeJabatan'])->name('kelas.remove_jabatan');
     });
 
     // --- RUTE UNTUK MANAJEMEN PERIZINAN ---
     Route::prefix('perizinan')->name('perizinan.')->group(function () {
+        // ... (semua route perizinan Anda tetap di sini) ...
         Route::get('create/{santri}', [PerizinanController::class, 'create'])->name('create');
         Route::post('store', [PerizinanController::class, 'store'])->name('store');
         Route::get('/', [PerizinanController::class, 'index'])->name('index');
-        // RUTE BARU UNTUK HAPUS
         Route::delete('/{perizinan}', [PerizinanController::class, 'destroy'])->name('destroy');
         Route::post('/bulk-delete', [PerizinanController::class, 'bulkDestroy'])->name('bulkDestroy');
-    });
-
-    // --- RUTE UNTUK LAPORAN & EXPORT ---
-    Route::prefix('reports')->name('reports.')->group(function () {
-        Route::get('/perizinan', [ReportController::class, 'index'])->name('perizinan.index');
-        Route::get('/perizinan/export', [ReportController::class, 'export'])->name('perizinan.export');
     });
 
     // --- GRUP RUTE KHUSUS ADMIN ---
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('users', UserController::class)->except(['show']);
+
+        // == PINDAHKAN KE SINI ==
+        // Rute untuk Manajemen Ruangan sekarang berada di dalam grup admin
+        Route::resource('master-data/rooms', \App\Http\Controllers\Admin\MasterData\RoomController::class)
+            ->names('rooms') // Ini akan menghasilkan nama seperti admin.rooms.index
+            ->except('show');
+        // Rute untuk Ketersediaan Guru
+        Route::get('master-data/teacher-availability', [\App\Http\Controllers\Admin\MasterData\TeacherAvailabilityController::class, 'index'])->name('teacher-availability.index');
+        Route::get('master-data/teacher-availability/{teacher}/edit', [\App\Http\Controllers\Admin\MasterData\TeacherAvailabilityController::class, 'edit'])->name('teacher-availability.edit');
+        Route::put('master-data/teacher-availability/{teacher}', [\App\Http\Controllers\Admin\MasterData\TeacherAvailabilityController::class, 'update'])->name('teacher-availability.update');
+        // Rute untuk Aturan Penjadwalan
+        Route::get('configuration/rules', [\App\Http\Controllers\Admin\Configuration\RuleController::class, 'index'])->name('rules.index');
+        Route::post('configuration/rules', [\App\Http\Controllers\Admin\Configuration\RuleController::class, 'store'])->name('rules.store');
+        // Rute untuk Generator Jadwal
+        Route::get('scheduling/generator', [\App\Http\Controllers\Admin\Scheduling\ScheduleGeneratorController::class, 'show'])->name('generator.show');
+        Route::post('scheduling/generator', [\App\Http\Controllers\Admin\Scheduling\ScheduleGeneratorController::class, 'generate'])->name('generator.generate');
+        // Rute untuk Melihat Jadwal
+        Route::get('scheduling/view/grid', [\App\Http\Controllers\Admin\Scheduling\ScheduleViewController::class, 'grid'])->name('schedule.view.grid');
     });
 
     // --- RUTE UNTUK MANAJEMEN PELANGGARAN ---
@@ -94,14 +109,12 @@ Route::middleware('auth')->group(function () {
 
     // --- RUTE UNTUK LAPORAN & EXPORT ---
     Route::prefix('laporan')->name('laporan.')->group(function () {
+        // ... (semua route laporan Anda tetap di sini) ...
         Route::get('/', [ReportController::class, 'index'])->name('index');
-
         Route::get('/perizinan', [ReportController::class, 'perizinan'])->name('perizinan');
         Route::get('/perizinan/export', [ReportController::class, 'exportPerizinan'])->name('perizinan.export');
-
         Route::get('/pelanggaran', [ReportController::class, 'pelanggaran'])->name('pelanggaran');
         Route::get('/pelanggaran/export', [ReportController::class, 'exportPelanggaran'])->name('pelanggaran.export');
-
         Route::get('/santri/export', [ReportController::class, 'exportSantri'])->name('santri.export');
     });
 
@@ -109,39 +122,36 @@ Route::middleware('auth')->group(function () {
     Route::prefix('akademik')->name('akademik.')->group(function () {
         Route::get('/nilai', [NilaiController::class, 'index'])->name('nilai.index');
         Route::post('/nilai', [NilaiController::class, 'store'])->name('nilai.store');
-        // RUTE BARU UNTUK EXPORT LEGER
         Route::get('/nilai/export', [NilaiController::class, 'exportLeger'])->name('nilai.export');
-        // RUTE BARU UNTUK PENEMPATAN KELAS
         Route::get('/placement', [PlacementController::class, 'index'])->name('placement.index');
         Route::post('/placement', [PlacementController::class, 'place'])->name('placement.place');
-    
-        // [PERBAIKAN] Ini adalah struktur rute yang benar untuk Kurikulum Terpadu
         Route::get('/kurikulum', [KurikulumController::class, 'index'])->name('kurikulum.index');
         Route::post('/kurikulum/template', [KurikulumController::class, 'storeTemplate'])->name('kurikulum.template.store');
         Route::get('/kurikulum/template/{template}/edit', [KurikulumController::class, 'editTemplate'])->name('kurikulum.template.edit');
         Route::put('/kurikulum/template/{template}', [KurikulumController::class, 'updateTemplate'])->name('kurikulum.template.update');
         Route::delete('/kurikulum/template/{template}', [KurikulumController::class, 'destroyTemplate'])->name('kurikulum.template.destroy');
         Route::post('/kurikulum/apply-template', [KurikulumController::class, 'applyTemplate'])->name('kurikulum.apply');
-        // RUTE BARU UNTUK MENGAMBIL DATA MAPEL VIA JSON
-            Route::get('/kurikulum/{kelas}/mapel-json', [KurikulumController::class, 'getMapelJson'])->name('kurikulum.mapel.json');
+        Route::get('/kurikulum/{kelas}/mapel-json', [KurikulumController::class, 'getMapelJson'])->name('kurikulum.mapel.json');
+        Route::post('/kurikulum', [KurikulumController::class, 'store'])->name('kurikulum.store');
+
+        // <-- KODE SEBELUMNYA ADA DI SINI, SEKARANG SUDAH DIPINDAH
     });
 
     // --- RUTE BARU UNTUK KEASRAMAAN ---
     Route::prefix('keasramaan')->name('keasramaan.')->group(function () {
-        // Catatan Harian
+        // ... (semua route keasramaan Anda tetap di sini) ...
         Route::get('/santri/{santri}/catatan/create', [CatatanHarianController::class, 'create'])->name('catatan.create');
         Route::post('/santri/{santri}/catatan', [CatatanHarianController::class, 'store'])->name('catatan.store');
         Route::get('/catatan/{catatan}/edit', [CatatanHarianController::class, 'edit'])->name('catatan.edit');
         Route::put('/catatan/{catatan}', [CatatanHarianController::class, 'update'])->name('catatan.update');
         Route::delete('/catatan/{catatan}', [CatatanHarianController::class, 'destroy'])->name('catatan.destroy');
-
-        // Prestasi
         Route::get('/santri/{santri}/prestasi/create', [PrestasiController::class, 'create'])->name('prestasi.create');
         Route::post('/santri/{santri}/prestasi', [PrestasiController::class, 'store'])->name('prestasi.store');
         Route::get('/prestasi/{prestasi}/edit', [PrestasiController::class, 'edit'])->name('prestasi.edit');
         Route::put('/prestasi/{prestasi}', [PrestasiController::class, 'update'])->name('prestasi.update');
         Route::delete('/prestasi/{prestasi}', [PrestasiController::class, 'destroy'])->name('prestasi.destroy');
     });
+
     // --- RUTE BARU UNTUK PUSAT MANAJEMEN SANTRI ---
     Route::prefix('manajemen-santri')->name('admin.santri-management.')->group(function () {
         Route::get('/', [SantriManagementController::class, 'index'])->name('index');
