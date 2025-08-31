@@ -9,13 +9,20 @@ use Illuminate\Http\Request;
 
 class MataPelajaranController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // [PERBAIKAN] Mengganti ->get() dengan ->paginate()
-        // Ini akan mengambil data dalam format halaman dan memungkinkan ->links()
-        $mataPelajarans = MataPelajaran::with('teachers')
-                            ->orderBy('nama_pelajaran')
-                            ->paginate(15); // Menampilkan 15 data per halaman
+        // Query dasar dengan eager loading
+        $query = MataPelajaran::with('teachers')
+                    ->orderBy('tingkatan')
+                    ->orderBy('nama_pelajaran');
+
+        // Filter berdasarkan tingkatan jika ada parameter
+        if ($request->has('tingkatan') && $request->tingkatan != '') {
+            $query->where('tingkatan', $request->tingkatan);
+        }
+
+        // Pagination
+        $mataPelajarans = $query->paginate(15);
 
         return view('pengajaran.mata-pelajaran.index', compact('mataPelajarans'));
     }
@@ -30,6 +37,7 @@ class MataPelajaranController extends Controller
     {
         $request->validate([
             'nama_pelajaran' => 'required|string|max:255',
+            'tingkatan' => 'required|in:1,2,3,4,5,6,Umum', // Validasi untuk tingkatan
             'kategori' => 'required|string|max:255',
             'duration_jp' => 'required|integer|min:1',
             'teacher_ids' => 'nullable|array',
@@ -38,6 +46,7 @@ class MataPelajaranController extends Controller
         
         $mataPelajaran = MataPelajaran::create([
             'nama_pelajaran' => $request->nama_pelajaran,
+            'tingkatan' => $request->tingkatan, // Menyimpan tingkatan
             'kategori' => $request->kategori,
             'duration_jp' => $request->duration_jp,
             'requires_special_room' => $request->has('requires_special_room'),
@@ -60,6 +69,7 @@ class MataPelajaranController extends Controller
     {
         $request->validate([
             'nama_pelajaran' => 'required|string|max:255',
+            'tingkatan' => 'required|in:1,2,3,4,5,6,Umum', // Validasi untuk tingkatan
             'kategori' => 'required|string|max:255',
             'duration_jp' => 'required|integer|min:1',
             'teacher_ids' => 'nullable|array',
@@ -68,6 +78,7 @@ class MataPelajaranController extends Controller
 
         $mataPelajaran->update([
             'nama_pelajaran' => $request->nama_pelajaran,
+            'tingkatan' => $request->tingkatan, // Memperbarui tingkatan
             'kategori' => $request->kategori,
             'duration_jp' => $request->duration_jp,
             'requires_special_room' => $request->has('requires_special_room'),
@@ -84,4 +95,3 @@ class MataPelajaranController extends Controller
         return redirect()->route('pengajaran.mata-pelajaran.index')->with('success', 'Mata pelajaran berhasil dihapus.');
     }
 }
-

@@ -25,11 +25,20 @@ class KurikulumController extends Controller
     }
 
     public function editTemplate(KurikulumTemplate $template)
-    {
-        $allMapel = MataPelajaran::orderBy('nama_pelajaran')->get();
-        $assignedMapelIds = $template->mataPelajarans->pluck('id');
-        return view('akademik.kurikulum.edit-template', compact('template', 'allMapel', 'assignedMapelIds'));
-    }
+{
+    $allMataPelajaran = MataPelajaran::orderBy('tingkatan')
+                          ->orderBy('nama_pelajaran')
+                          ->get();
+    
+    // [PERBAIKAN] Convert Collection ke array
+    $assignedMapelIds = $template->mataPelajarans->pluck('id')->toArray();
+    
+    return view('akademik.kurikulum.edit-template', compact(
+        'template', 
+        'allMataPelajaran', 
+        'assignedMapelIds'
+    ));
+}
 
     public function updateTemplate(Request $request, KurikulumTemplate $template)
     {
@@ -43,7 +52,7 @@ class KurikulumController extends Controller
         $template->delete();
         return back()->with('success', 'Template kurikulum berhasil dihapus.');
     }
-    
+
     public function applyTemplate(Request $request)
     {
         $request->validate([
@@ -53,7 +62,7 @@ class KurikulumController extends Controller
         ]);
 
         $template = KurikulumTemplate::findOrFail($request->template_id);
-        
+
         foreach ($request->kelas_ids as $kelasId) {
             $kelas = Kelas::find($kelasId);
             $kelas->kurikulumTemplate()->associate($template);
@@ -66,15 +75,24 @@ class KurikulumController extends Controller
 
     public function getMapelJson(Kelas $kelas)
     {
-        // [PERBAIKAN] Logika query disederhanakan karena pivot sudah diatur di Model.
-        $mapelForClass = $kelas->mataPelajarans()->with('teachers')->get();
-        
+        // [PERBAIKAN] Ambil tingkatan dari nama kelas (asumsi format: "Kelas 1 A" -> tingkatan "1")
+        $tingkatan = preg_replace('/[^0-9]/', '', $kelas->nama_kelas);
+        $tingkatan = $tingkatan ?: 'Umum';
+
+        // Filter mata pelajaran berdasarkan tingkatan kelas
+        $mapelForClass = $kelas->mataPelajarans()
+            ->where('tingkatan', $tingkatan)
+            ->orWhere('tingkatan', 'Umum')
+            ->with('teachers')
+            ->get();
+
         $response = $mapelForClass->map(function ($mapel) {
             return [
                 'id' => $mapel->id,
                 'nama_pelajaran' => $mapel->nama_pelajaran,
+                'tingkatan' => $mapel->tingkatan, // Tambahkan info tingkatan
                 'assigned' => true,
-                'assigned_teacher_id' => $mapel->pivot->user_id, // Mengakses data pivot
+                'assigned_teacher_id' => $mapel->pivot->user_id,
                 'teachers' => $mapel->teachers->map(fn($teacher) => ['id' => $teacher->id, 'name' => $teacher->name]),
             ];
         });
@@ -94,15 +112,14 @@ class KurikulumController extends Controller
 
         if ($request->has('kurikulum')) {
             foreach ($request->kurikulum as $mapelId => $details) {
-                if(isset($details['assigned']) && $details['assigned']) {
+                if (isset($details['assigned']) && $details['assigned']) {
                     $syncData[$mapelId] = ['user_id' => $details['teacher_id'] ?? null];
                 }
             }
         }
-        
+
         $kelas->mataPelajarans()->sync($syncData);
 
         return back()->with('success', 'Kurikulum untuk kelas ' . $kelas->nama_kelas . ' berhasil diperbarui.');
     }
 }
-

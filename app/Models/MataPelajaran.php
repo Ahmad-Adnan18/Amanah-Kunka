@@ -12,6 +12,7 @@ class MataPelajaran extends Model
 
     protected $fillable = [
         'nama_pelajaran',
+        'tingkatan',
         'kategori',
         'duration_jp',
         'requires_special_room',

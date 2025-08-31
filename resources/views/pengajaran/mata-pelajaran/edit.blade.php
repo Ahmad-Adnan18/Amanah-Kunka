@@ -27,9 +27,24 @@
                                 <x-input-error class="mt-2" :messages="$errors->get('nama_pelajaran')" />
                             </div>
 
+                            <!-- TAMBAHAN: Field untuk memilih tingkatan -->
+                            <div>
+                                <label for="tingkatan" class="block text-sm font-medium text-gray-700">Tingkatan/Kelas</label>
+                                <select name="tingkatan" id="tingkatan" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500">
+                                    <option value="">-- Pilih Tingkatan --</option>
+                                    <option value="1" {{ old('tingkatan', $mataPelajaran->tingkatan) == '1' ? 'selected' : '' }}>Kelas 1</option>
+                                    <option value="2" {{ old('tingkatan', $mataPelajaran->tingkatan) == '2' ? 'selected' : '' }}>Kelas 2</option>
+                                    <option value="3" {{ old('tingkatan', $mataPelajaran->tingkatan) == '3' ? 'selected' : '' }}>Kelas 3</option>
+                                    <option value="4" {{ old('tingkatan', $mataPelajaran->tingkatan) == '4' ? 'selected' : '' }}>Kelas 4</option>
+                                    <option value="5" {{ old('tingkatan', $mataPelajaran->tingkatan) == '5' ? 'selected' : '' }}>Kelas 5</option>
+                                    <option value="6" {{ old('tingkatan', $mataPelajaran->tingkatan) == '6' ? 'selected' : '' }}>Kelas 6</option>
+                                    <option value="Umum" {{ old('tingkatan', $mataPelajaran->tingkatan) == 'Umum' ? 'selected' : '' }}>Umum (Semua Kelas)</option>
+                                </select>
+                                <x-input-error class="mt-2" :messages="$errors->get('tingkatan')" />
+                            </div>
+
                             <div>
                                 <label for="kategori" class="block text-sm font-medium text-gray-700">Kategori</label>
-                                {{-- [PERBAIKAN] Mengganti input teks menjadi dropdown --}}
                                 <select name="kategori" id="kategori" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500">
                                     <option value="Umum" {{ old('kategori', $mataPelajaran->kategori) == 'Umum' ? 'selected' : '' }}>Umum</option>
                                     <option value="Diniyah" {{ old('kategori', $mataPelajaran->kategori) == 'Diniyah' ? 'selected' : '' }}>Diniyah</option>
@@ -84,4 +99,3 @@
         </div>
     </div>
 </x-app-layout>
-

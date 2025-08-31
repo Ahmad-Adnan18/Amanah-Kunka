@@ -13,6 +13,19 @@
                             Tambah Mata Pelajaran
                         </a>
                     </div>
+                    
+                    <!-- TAMBAHAN: Filter berdasarkan tingkatan -->
+                    <div class="mt-6 flex flex-wrap gap-4">
+                        <span class="text-sm font-medium text-gray-700">Filter berdasarkan tingkatan:</span>
+                        <a href="{{ route('pengajaran.mata-pelajaran.index') }}" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ request('tingkatan') == '' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800' }}">
+                            Semua
+                        </a>
+                        @foreach(['1', '2', '3', '4', '5', '6', 'Umum'] as $tingkat)
+                            <a href="{{ route('pengajaran.mata-pelajaran.index', ['tingkatan' => $tingkat]) }}" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ request('tingkatan') == $tingkat ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800' }}">
+                                {{ $tingkat == 'Umum' ? 'Umum' : 'Kelas ' . $tingkat }}
+                            </a>
+                        @endforeach
+                    </div>
                 </div>
                 
                 <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
@@ -20,6 +33,7 @@
                         <thead class="bg-slate-50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Nama Pelajaran</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Tingkatan</th>
                                 <th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Kategori</th>
                                 <th class="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase">Durasi (JP)</th>
                                 <th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Guru Pengampu</th>
@@ -30,6 +44,13 @@
                             @forelse ($mataPelajarans as $mapel)
                                 <tr>
                                     <td class="px-6 py-4 whitespace-nowrap font-medium text-slate-900">{{ $mapel->nama_pelajaran }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-slate-600">
+                                        @if($mapel->tingkatan == 'Umum')
+                                            Umum
+                                        @else
+                                            Kelas {{ $mapel->tingkatan }}
+                                        @endif
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-slate-600">{{ $mapel->kategori }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-slate-600 text-center">{{ $mapel->duration_jp }}</td>
                                     <td class="px-6 py-4 text-slate-600">
@@ -47,14 +68,13 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="px-6 py-12 text-center text-slate-500">Tidak ada data mata pelajaran.</td>
+                                    <td colspan="6" class="px-6 py-12 text-center text-slate-500">Tidak ada data mata pelajaran.</td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
 
-                {{-- [PERBAIKAN] Menambahkan link pagination di bawah tabel --}}
                 <div class="mt-4">
                     {{ $mataPelajarans->links() }}
                 </div>
@@ -63,4 +83,3 @@
         </div>
     </div>
 </x-app-layout>
-
