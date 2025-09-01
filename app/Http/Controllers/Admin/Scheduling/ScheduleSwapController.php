@@ -32,10 +32,11 @@ class ScheduleSwapController extends Controller
 
         foreach ($schedules as $schedule) {
             // [PERBAIKAN FINAL] Mengganti isset() dengan array_key_exists() yang lebih andal
-            if (array_key_exists($schedule->day_of_week, $grid) && 
-                array_key_exists($schedule->kelas_id, $grid[$schedule->day_of_week]) && 
-                array_key_exists($schedule->time_slot, $grid[$schedule->day_of_week][$schedule->kelas_id])) 
-            {
+            if (
+                array_key_exists($schedule->day_of_week, $grid) &&
+                array_key_exists($schedule->kelas_id, $grid[$schedule->day_of_week]) &&
+                array_key_exists($schedule->time_slot, $grid[$schedule->day_of_week][$schedule->kelas_id])
+            ) {
                 $grid[$schedule->day_of_week][$schedule->kelas_id][$schedule->time_slot] = $schedule;
             }
         }
@@ -43,7 +44,7 @@ class ScheduleSwapController extends Controller
         $validationResult = session('validationResult');
         $sourceScheduleId = session('sourceScheduleId');
         $targetScheduleId = session('targetScheduleId');
-        
+
         $sourceSchedule = $sourceScheduleId ? Schedule::find($sourceScheduleId) : null;
         $targetSchedule = $targetScheduleId ? Schedule::find($targetScheduleId) : null;
 
@@ -64,7 +65,7 @@ class ScheduleSwapController extends Controller
         $validationResult = $this->validateSwap($source, $target);
 
         if ($request->has('confirm_swap') && $validationResult['isValid']) {
-            
+
             DB::transaction(function () use ($source, $target) {
                 $targetDay = $target->day_of_week;
                 $targetSlot = $target->time_slot;
@@ -87,21 +88,29 @@ class ScheduleSwapController extends Controller
     private function validateSwap(Schedule $source, Schedule $target): array
     {
         $errors = [];
-        if (!$this->isSlotValidForSubject($target->day_of_week, $target->time_slot, $source->subject)) {
-            $errors[] = "Slot target tidak diizinkan untuk {$source->subject->nama_pelajaran}.";
+
+        // [PERBAIKAN] Validasi sekarang membandingkan tingkatan dari MATA PELAJARAN
+        if ($source->subject->tingkatan !== $target->subject->tingkatan) {
+            $errors[] = "Pertukaran jadwal hanya bisa dilakukan antar mata pelajaran dengan tingkatan yang sama.";
+        } else {
+            // Validasi lain hanya dijalankan jika tingkatannya sama
+            if (!$this->isSlotValidForSubject($target->day_of_week, $target->time_slot, $source->subject)) {
+                $errors[] = "Slot target tidak diizinkan untuk {$source->subject->nama_pelajaran}.";
+            }
+            if (!$this->isTeacherAvailable($source->teacher_id, $target->day_of_week, $target->time_slot)) {
+                $errors[] = "{$source->teacher->name} tidak tersedia di slot target.";
+            }
+            if (!$this->isSlotValidForSubject($source->day_of_week, $source->time_slot, $target->subject)) {
+                $errors[] = "Slot sumber tidak diizinkan untuk {$target->subject->nama_pelajaran}.";
+            }
+            if (!$this->isTeacherAvailable($target->teacher_id, $source->day_of_week, $source->time_slot)) {
+                $errors[] = "{$target->teacher->name} tidak tersedia di slot sumber.";
+            }
         }
-        if (!$this->isTeacherAvailable($source->teacher_id, $target->day_of_week, $target->time_slot)) {
-            $errors[] = "{$source->teacher->name} tidak tersedia di slot target.";
-        }
-        if (!$this->isSlotValidForSubject($source->day_of_week, $source->time_slot, $target->subject)) {
-            $errors[] = "Slot sumber tidak diizinkan untuk {$target->subject->nama_pelajaran}.";
-        }
-        if (!$this->isTeacherAvailable($target->teacher_id, $source->day_of_week, $source->time_slot)) {
-            $errors[] = "{$target->teacher->name} tidak tersedia di slot sumber.";
-        }
+
         return ['isValid' => empty($errors), 'errors' => $errors, 'source' => $source, 'target' => $target];
     }
-    
+
     private function isTeacherAvailable($teacherId, $day, $timeSlot): bool
     {
         return !TeacherUnavailability::where('teacher_id', $teacherId)
@@ -109,10 +118,11 @@ class ScheduleSwapController extends Controller
             ->where('time_slot', $timeSlot)
             ->exists();
     }
-    
+
     private function isSlotValidForSubject($day, $timeSlot, $subject): bool
     {
-        if (!$subject) return false;
+        if (!$subject)
+            return false;
 
         if (BlockedTime::where('day_of_week', $day)->where('time_slot', $timeSlot)->exists()) {
             return false;
