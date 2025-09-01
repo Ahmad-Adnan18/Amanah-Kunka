@@ -30,6 +30,7 @@
                             </div>
                             <!-- Tombol Aksi Cepat -->
                             <div class="flex-shrink-0 w-full sm:w-auto mt-4 md:mt-0" x-data="{ open: false }">
+                            @if(in_array(Auth::user()->role, ['admin','pengajaran','pengasuhan','kesehatan','ustadz_umum']))
                                 <div class="relative flex justify-center md:justify-end">
                                     <button @click="open = !open" class="w-full sm:w-auto inline-flex items-center justify-center rounded-md bg-red-700 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-600">
                                         <span>Aksi Cepat</span>
@@ -37,6 +38,7 @@
                                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                                         </svg>
                                     </button>
+                                    @endif
                                     <div x-show="open" @click.outside="open = false" x-transition class="absolute z-10 mt-2 w-48 sm:w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" :class="{'right-0 top-full': !$isMobile(), 'left-0 bottom-full': $isMobile()}" x-cloak>
                                         <div class="py-1">
                                             @can('create', App\Models\Perizinan::class)

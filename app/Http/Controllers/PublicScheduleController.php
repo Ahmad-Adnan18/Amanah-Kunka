@@ -27,6 +27,8 @@ class PublicScheduleController extends Controller
         $scheduleData = [
             'byClass' => $this->formatScheduleForJs($schedules, 'kelas_id'),
             'byTeacher' => $this->formatScheduleForJs($schedules, 'teacher_id'),
+            // [TAMBAHAN] Hitung jumlah mengajar per guru
+            'teachingHours' => $this->calculateTeachingHours($schedules),
         ];
 
         // [PERBAIKAN] Mendefinisikan hari sekolah dari Sabtu sampai Kamis
@@ -55,5 +57,84 @@ class PublicScheduleController extends Controller
         }
         return $formatted;
     }
-}
 
+    /**
+     * [FUNGSI BARU] Menghitung jumlah mengajar per hari untuk setiap guru
+     */
+    private function calculateTeachingHours($schedules)
+    {
+        $teachingHours = [];
+
+        foreach ($schedules as $schedule) {
+            $teacherId = $schedule->teacher_id;
+            $dayOfWeek = $schedule->day_of_week;
+
+            if (!isset($teachingHours[$teacherId])) {
+                $teachingHours[$teacherId] = [
+                    'sabtu' => 0,
+                    'ahad' => 0,
+                    'senin' => 0,
+                    'selasa' => 0,
+                    'rabu' => 0,
+                    'kamis' => 0,
+                    'total' => 0
+                ];
+            }
+
+            // Mapping day_of_week ke nama hari
+            $dayMap = [
+                1 => 'sabtu',
+                2 => 'ahad',
+                3 => 'senin', 
+                4 => 'selasa',
+                5 => 'rabu',
+                6 => 'kamis'
+            ];
+
+            if (isset($dayMap[$dayOfWeek])) {
+                $dayName = $dayMap[$dayOfWeek];
+                $teachingHours[$teacherId][$dayName]++;
+                $teachingHours[$teacherId]['total']++;
+            }
+        }
+
+        return $teachingHours;
+    }
+
+    /**
+     * [FUNGSI BARU] API endpoint untuk mendapatkan jumlah jam mengajar per guru
+     */
+    public function getTeachingHours($teacherId)
+    {
+        $schedules = Schedule::where('teacher_id', $teacherId)->get();
+        
+        $teachingHours = [
+            'sabtu' => 0,
+            'ahad' => 0,
+            'senin' => 0,
+            'selasa' => 0,
+            'rabu' => 0,
+            'kamis' => 0,
+            'total' => 0
+        ];
+
+        foreach ($schedules as $schedule) {
+            $dayMap = [
+                1 => 'sabtu',
+                2 => 'ahad',
+                3 => 'senin',
+                4 => 'selasa', 
+                5 => 'rabu',
+                6 => 'kamis'
+            ];
+
+            if (isset($dayMap[$schedule->day_of_week])) {
+                $dayName = $dayMap[$schedule->day_of_week];
+                $teachingHours[$dayName]++;
+                $teachingHours['total']++;
+            }
+        }
+
+        return response()->json($teachingHours);
+    }
+}

@@ -102,6 +102,9 @@ Route::middleware('auth')->group(function () {
         Route::post('scheduling/generator', [\App\Http\Controllers\Admin\Scheduling\ScheduleGeneratorController::class, 'generate'])->name('generator.generate');
         // Rute untuk Melihat Jadwal
         Route::get('scheduling/view/grid', [\App\Http\Controllers\Admin\Scheduling\ScheduleViewController::class, 'grid'])->name('schedule.view.grid');
+        // RUTE BARU UNTUK FITUR TUKAR JADWAL MANUAL
+        Route::get('scheduling/swap', [\App\Http\Controllers\Admin\Scheduling\ScheduleSwapController::class, 'showForm'])->name('schedule.swap.show');
+        Route::post('scheduling/swap/process', [\App\Http\Controllers\Admin\Scheduling\ScheduleSwapController::class, 'processSwap'])->name('schedule.swap.process');
     });
 
     // --- RUTE UNTUK MANAJEMEN PELANGGARAN ---

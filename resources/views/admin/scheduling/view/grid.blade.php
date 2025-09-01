@@ -10,6 +10,13 @@
                 </div>
             </div>
 
+            {{-- [PENAMBAHAN] Panel Notifikasi untuk menampilkan pesan sukses --}}
+            @if (session('success'))
+                <div class="bg-green-100 border border-green-200 text-green-800 px-4 py-3 rounded-2xl shadow-sm mb-6">
+                    {{ session('success') }}
+                </div>
+            @endif
+
             <div class="space-y-12">
                 @foreach ($days as $dayKey => $dayName)
                     <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
