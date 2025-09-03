@@ -5,28 +5,39 @@ namespace App\Http\Controllers\Pengajaran;
 use App\Http\Controllers\Controller;
 use App\Models\MataPelajaran;
 use App\Models\User;
+use App\Models\BlockedTime;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class MataPelajaranController extends Controller
 {
     public function index(Request $request)
     {
-        // Query dasar dengan eager loading
-        $query = MataPelajaran::with('teachers')
-                    ->orderBy('tingkatan')
-                    ->orderBy('nama_pelajaran');
+        // Query dasar
+        $query = MataPelajaran::with('teachers');
 
-        // Filter berdasarkan tingkatan jika ada parameter
+        // Filter berdasarkan tingkatan
         if ($request->has('tingkatan') && $request->tingkatan != '') {
             $query->where('tingkatan', $request->tingkatan);
         }
 
         // Pagination
-        $mataPelajarans = $query->paginate(15);
+        $mataPelajarans = $query->orderBy('tingkatan')->orderBy('nama_pelajaran')->paginate(15);
 
-        return view('pengajaran.mata-pelajaran.index', compact('mataPelajarans'));
+        // [LOGIKA BARU] Menghitung total JP yang sudah dialokasikan per tingkatan
+        $jpPerTingkat = MataPelajaran::select('tingkatan', DB::raw('SUM(duration_jp) as total_jp'))
+            ->groupBy('tingkatan')
+            ->pluck('total_jp', 'tingkatan');
+
+        // Menghitung jam terblokir
+        $blockedSlotsCount = BlockedTime::count();
+        $kapasitasTotal = 6 * 7; // 6 hari x 7 jam
+        $jamEfektif = $kapasitasTotal - $blockedSlotsCount;
+
+        return view('pengajaran.mata-pelajaran.index', compact('mataPelajarans', 'jpPerTingkat', 'jamEfektif'));
     }
 
+    // Metode create, store, edit, update, destroy tidak berubah secara signifikan
     public function create()
     {
         $teachers = User::where('role', '!=', 'wali_santri')->orderBy('name')->get();
@@ -37,7 +48,7 @@ class MataPelajaranController extends Controller
     {
         $request->validate([
             'nama_pelajaran' => 'required|string|max:255',
-            'tingkatan' => 'required|in:1,2,3,4,5,6,Umum', // Validasi untuk tingkatan
+            'tingkatan' => 'required',
             'kategori' => 'required|string|max:255',
             'duration_jp' => 'required|integer|min:1',
             'teacher_ids' => 'nullable|array',
@@ -46,7 +57,7 @@ class MataPelajaranController extends Controller
         
         $mataPelajaran = MataPelajaran::create([
             'nama_pelajaran' => $request->nama_pelajaran,
-            'tingkatan' => $request->tingkatan, // Menyimpan tingkatan
+            'tingkatan' => $request->tingkatan,
             'kategori' => $request->kategori,
             'duration_jp' => $request->duration_jp,
             'requires_special_room' => $request->has('requires_special_room'),
@@ -69,7 +80,7 @@ class MataPelajaranController extends Controller
     {
         $request->validate([
             'nama_pelajaran' => 'required|string|max:255',
-            'tingkatan' => 'required|in:1,2,3,4,5,6,Umum', // Validasi untuk tingkatan
+            'tingkatan' => 'required',
             'kategori' => 'required|string|max:255',
             'duration_jp' => 'required|integer|min:1',
             'teacher_ids' => 'nullable|array',
@@ -78,7 +89,7 @@ class MataPelajaranController extends Controller
 
         $mataPelajaran->update([
             'nama_pelajaran' => $request->nama_pelajaran,
-            'tingkatan' => $request->tingkatan, // Memperbarui tingkatan
+            'tingkatan' => $request->tingkatan,
             'kategori' => $request->kategori,
             'duration_jp' => $request->duration_jp,
             'requires_special_room' => $request->has('requires_special_room'),
@@ -95,3 +106,4 @@ class MataPelajaranController extends Controller
         return redirect()->route('pengajaran.mata-pelajaran.index')->with('success', 'Mata pelajaran berhasil dihapus.');
     }
 }
+

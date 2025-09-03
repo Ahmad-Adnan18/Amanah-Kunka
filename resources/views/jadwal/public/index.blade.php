@@ -216,7 +216,7 @@
                                             <div class="font-semibold text-slate-900" x-text="scheduleToShow[{{ $dayKey }}][{{ $timeSlot }}].subject"></div>
                                             <div class="mt-1" x-text="scheduleToShow[{{ $dayKey }}][{{ $timeSlot }}].teacher"></div>
                                         </div>
-                                        {{--<div class="text-slate-400 italic mt-2 text-right" x-text="scheduleToShow[{{ $dayKey }}][{{ $timeSlot }}].room"></div>--}}
+                                        <div class="text-slate-400 italic mt-2 text-right" x-text="scheduleToShow[{{ $dayKey }}][{{ $timeSlot }}].room"></div>
                                     </div>
                                 </template>
                             </td>
