@@ -1,5 +1,5 @@
 <?php
-    
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +14,14 @@ class Kelas extends Model
 
     protected $table = 'kelas';
 
-    protected $fillable = ['nama_kelas', 'kurikulum_template_id'];
+    // [PERUBAHAN] Tambahkan 'room_id' agar bisa diisi secara massal
+    protected $fillable = ['nama_kelas', 'kurikulum_template_id', 'room_id'];
+
+    // [RELASI BARU] Mendefinisikan hubungan ke model Room
+    public function room(): BelongsTo
+    {
+        return $this->belongsTo(Room::class, 'room_id');
+    }
 
     public function santris(): HasMany
     {
@@ -26,11 +33,6 @@ class Kelas extends Model
         return $this->hasMany(JabatanUser::class);
     }
     
-    /**
-     * [PERBAIKAN] Menambahkan ->withPivot('user_id')
-     * Ini memberitahu Laravel bahwa kita ingin mengambil kolom 'user_id'
-     * dari tabel penghubung 'kelas_mata_pelajaran'.
-     */
     public function mataPelajarans(): BelongsToMany
     {
         return $this->belongsToMany(MataPelajaran::class, 'kelas_mata_pelajaran')->withPivot('user_id');
@@ -41,4 +43,3 @@ class Kelas extends Model
         return $this->belongsTo(KurikulumTemplate::class);
     }
 }
-

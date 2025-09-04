@@ -8,11 +8,12 @@ use App\Models\User;
 use App\Models\Santri;
 use App\Models\Jabatan;
 use App\Models\JabatanUser;
+use App\Models\Room; // [PERUBAHAN] Menambahkan model Room
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Artisan; // <-- Tambahkan ini
-use Maatwebsite\Excel\Facades\Excel;   // <-- Tambahkan ini
-use App\Exports\WaliCodesExport;      // <-- Tambahkan ini
+use Illuminate\Support\Facades\Artisan;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\WaliCodesExport;
 
 class KelasController extends Controller
 {
@@ -22,12 +23,11 @@ class KelasController extends Controller
     {
         $this->authorize('viewAny', Kelas::class);
         
-        // Selalu ambil daftar semua kelas untuk ditampilkan
-        $kelas_list = Kelas::withCount('santris')->latest()->paginate(50);
+        // [PERUBAHAN] Menambahkan eager loading untuk relasi 'room' agar efisien
+        $kelas_list = Kelas::withCount('santris')->with('room')->latest()->paginate(50);
         
-        $hasilPencarianSantri = collect(); // Buat collection kosong sebagai default
+        $hasilPencarianSantri = collect();
 
-        // Logika BARU: Jika ada input pencarian, cari santri secara global
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $hasilPencarianSantri = Santri::with('kelas')
@@ -42,14 +42,26 @@ class KelasController extends Controller
     public function create()
     {
         $this->authorize('create', Kelas::class);
-        return view('pengajaran.kelas.create');
+        
+        // [PERUBAHAN] Mengambil daftar ruangan untuk dikirim ke view
+        $rooms = Room::orderBy('name')->get();
+
+        return view('pengajaran.kelas.create', compact('rooms'));
     }
 
     public function store(Request $request)
     {
         $this->authorize('create', Kelas::class);
-        $request->validate(['nama_kelas' => 'required|string|max:255|unique:kelas,nama_kelas']);
-        Kelas::create($request->all());
+
+        // [PERUBAHAN] Menambahkan validasi untuk room_id
+        $validatedData = $request->validate([
+            'nama_kelas' => 'required|string|max:255|unique:kelas,nama_kelas',
+            'room_id' => 'nullable|exists:rooms,id',
+        ]);
+
+        // 'is_active_for_scheduling' akan otomatis terisi nilai default (0) dari database
+        Kelas::create($validatedData);
+
         return redirect()->route('pengajaran.kelas.index')->with('success', 'Kelas berhasil ditambahkan.');
     }
 
@@ -57,28 +69,33 @@ class KelasController extends Controller
     {
         $this->authorize('update', $kela);
 
-        // Ambil data yang dibutuhkan untuk form penunjukan
+        // Data untuk form penunjukan jabatan
         $users = User::whereIn('role', ['pengajaran', 'pengasuhan', 'kesehatan', 'ustadz_umum', 'admin'])->orderBy('name')->get();
         $jabatans = Jabatan::orderBy('nama_jabatan')->get();
-
-        // Ambil daftar penanggung jawab yang sudah ada untuk kelas ini
         $penanggungJawab = $kela->penanggungJawab()->with('user', 'jabatan')->get();
 
-        return view('pengajaran.kelas.edit', compact('kela', 'users', 'jabatans', 'penanggungJawab'));
+        // [PERUBAHAN] Mengambil daftar ruangan untuk dikirim ke view edit
+        $rooms = Room::orderBy('name')->get();
+
+        return view('pengajaran.kelas.edit', compact('kela', 'users', 'jabatans', 'penanggungJawab', 'rooms'));
     }
 
     public function update(Request $request, Kelas $kela)
     {
         $this->authorize('update', $kela);
-        $request->validate(['nama_kelas' => 'required|string|max:255|unique:kelas,nama_kelas,' . $kela->id]);
-        $kela->update($request->all());
-        return redirect()->route('pengajaran.kelas.index')->with('success', 'Kelas berhasil diperbarui.');
+
+        // [PERUBAHAN] Menambahkan validasi untuk room_id dan status penjadwalan
+        $validatedData = $request->validate([
+            'nama_kelas' => 'required|string|max:255|unique:kelas,nama_kelas,' . $kela->id,
+            'room_id' => 'nullable|exists:rooms,id',
+            'is_active_for_scheduling' => 'required|boolean',
+        ]);
+
+        $kela->update($validatedData);
+
+        return redirect()->route('pengajaran.kelas.index')->with('success', 'Detail kelas berhasil diperbarui.');
     }
 
-    /**
-     * TAMBAHKAN METHOD INI
-     * Untuk menunjuk user ke sebuah jabatan di kelas ini.
-     */
     public function assignJabatan(Request $request, Kelas $kelas)
     {
         $this->authorize('update', $kelas);
@@ -89,7 +106,6 @@ class KelasController extends Controller
             'tahun_ajaran' => 'required|string|max:9',
         ]);
 
-        // Cek agar tidak ada duplikasi jabatan untuk user yang sama di kelas yang sama
         JabatanUser::updateOrCreate(
             [
                 'user_id' => $request->user_id,
@@ -103,17 +119,12 @@ class KelasController extends Controller
         return redirect()->back()->with('success', 'Penanggung jawab berhasil ditambahkan.');
     }
 
-    /**
-     * TAMBAHKAN METHOD INI
-     * Untuk menghapus penunjukan jabatan.
-     */
     public function removeJabatan(JabatanUser $jabatanUser)
     {
-        $this->authorize('update', $jabatanUser->kelas); // Otorisasi berdasarkan kelasnya
+        $this->authorize('update', $jabatanUser->kelas);
         $jabatanUser->delete();
         return redirect()->back()->with('success', 'Penanggung jawab berhasil dihapus.');
     }
-
 
     public function destroy(Kelas $kela)
     {
@@ -122,38 +133,22 @@ class KelasController extends Controller
         return redirect()->route('pengajaran.kelas.index')->with('success', 'Kelas berhasil dihapus.');
     }
 
-    /**
-     * Mengembalikan daftar santri dalam format JSON untuk kelas tertentu.
-     */
     public function getSantrisJson(Kelas $kelas)
     {
-        // Otorisasi tidak diperlukan di sini karena hanya mengembalikan data
-        // untuk pengguna yang sudah terotentikasi di halaman form.
         $santris = $kelas->santris()->select('id', 'nama')->orderBy('nama')->get();
         return response()->json($santris);
     }
 
-    /**
-     * TAMBAHKAN METHOD INI
-     * Menangani permintaan untuk men-generate semua kode wali.
-     */
     public function generateAllWaliCodes()
     {
-        $this->authorize('create', Kelas::class); // Hanya role yang bisa membuat kelas yang bisa generate
-
+        $this->authorize('create', Kelas::class);
         Artisan::call('app:generate-wali-codes');
-
         return redirect()->back()->with('success', 'Proses pembuatan kode registrasi untuk semua santri telah selesai.');
     }
 
-    /**
-     * TAMBAHKAN METHOD INI
-     * Menangani permintaan export data kode wali ke Excel.
-     */
     public function exportWaliCodes()
     {
         $this->authorize('viewAny', Kelas::class);
-
         return Excel::download(new WaliCodesExport, 'daftar-kode-registrasi-wali.xlsx');
     }
 }

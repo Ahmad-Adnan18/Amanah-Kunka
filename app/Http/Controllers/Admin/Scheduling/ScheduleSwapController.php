@@ -94,9 +94,7 @@ class ScheduleSwapController extends Controller
             $errors[] = "Pertukaran jadwal hanya bisa dilakukan antar mata pelajaran dengan tingkatan yang sama.";
         } else {
             // Validasi lain hanya dijalankan jika tingkatannya sama
-            if (!$this->isSlotValidForSubject($target->day_of_week, $target->time_slot, $source->subject)) {
-                $errors[] = "Slot target tidak diizinkan untuk {$source->subject->nama_pelajaran}.";
-            }
+            
             if (!$this->isTeacherAvailable($source->teacher_id, $target->day_of_week, $target->time_slot)) {
                 $errors[] = "{$source->teacher->name} tidak tersedia di slot target.";
             }

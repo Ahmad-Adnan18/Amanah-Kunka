@@ -10,10 +10,10 @@ use App\Models\Schedule;
 use App\Models\TeacherUnavailability;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
+use Exception;
 
 class ScheduleGeneratorService
 {
-    // ... (properti lain tetap sama) ...
     private Collection $classes;
     private Collection $rooms;
     private Collection $teacherUnavailabilities;
@@ -22,7 +22,6 @@ class ScheduleGeneratorService
     private array $scheduleGrid = [];
     private array $unplacedSubjects = [];
     private array $debugLog = [];
-
 
     public function run()
     {
@@ -42,9 +41,9 @@ class ScheduleGeneratorService
                 'unplaced' => $this->unplacedSubjects,
                 'log' => $this->debugLog
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
-            $this->debugLog[] = "ERROR: " . $e->getMessage();
+            $this->debugLog[] = "ERROR KRITIS: " . $e->getMessage();
             return [
                 'success' => false,
                 'unplaced' => $this->unplacedSubjects,
@@ -62,7 +61,19 @@ class ScheduleGeneratorService
         Schedule::query()->delete();
         $this->debugLog[] = "Jadwal lama berhasil dihapus.";
         
-        $this->classes = Kelas::where('is_active_for_scheduling', true)->with('mataPelajarans.teachers')->get();
+        // Mengambil semua data kelas yang aktif untuk penjadwalan
+        // Eager loading '[mataPelajarans.teachers', 'room']' sangat penting untuk performa
+        $this->classes = Kelas::where('is_active_for_scheduling', true)
+                            ->with(['mataPelajarans.teachers', 'room'])
+                            ->get();
+
+        // Validasi: memastikan semua kelas aktif punya ruangan induk
+        foreach ($this->classes as $class) {
+            if (is_null($class->room)) {
+                throw new Exception("Kelas '{$class->nama_kelas}' belum memiliki Ruangan Induk (Home Room). Harap tetapkan terlebih dahulu.");
+            }
+        }
+        
         $this->rooms = Room::all();
         $this->teacherUnavailabilities = TeacherUnavailability::all()->groupBy('teacher_id');
         $this->hourPriorities = HourPriority::all();
@@ -74,8 +85,8 @@ class ScheduleGeneratorService
     private function buildSchedule(): void
     {
         foreach ($this->classes as $class) {
-            $className = $class->full_name ?? $class->nama_kelas;
-            $this->debugLog[] = "--- Memproses Kelas: {$className} ---";
+            $className = $class->nama_kelas;
+            $this->debugLog[] = "--- Memproses Kelas: {$className} (Ruangan Induk: {$class->room->name}) ---";
             
             $subjectsToPlace = $this->getSubjectsForClass($class);
 
@@ -86,22 +97,19 @@ class ScheduleGeneratorService
 
                 $this->debugLog[] = "Mencoba menempatkan mapel: {$subject->nama_pelajaran} (1 JP)";
 
-                $availableTeachers = collect();
+                $availableTeachers = $subject->teachers;
                 if ($specificTeacherId) {
                     $teacher = $subject->teachers->find($specificTeacherId);
-                    if ($teacher) $availableTeachers->push($teacher);
-                } else {
-                    $availableTeachers = $subject->teachers;
+                    $availableTeachers = $teacher ? collect([$teacher]) : collect();
                 }
 
                 if ($availableTeachers->isEmpty()) {
-                    $this->debugLog[] = "GAGAL: Tidak ada guru yang ditugaskan/bisa mengajar '{$subject->nama_pelajaran}'.";
+                    $this->debugLog[] = "GAGAL: Tidak ada guru yang bisa mengajar '{$subject->nama_pelajaran}'.";
                     $this->unplacedSubjects[] = "{$subject->nama_pelajaran} ({$className}) - Alasan: Tidak ada guru.";
                     continue;
                 }
 
-                // [PERBAIKAN] Memastikan loop hanya berjalan untuk hari Sabtu - Kamis
-                $days = collect([1, 2, 3, 4, 5, 6])->shuffle(); 
+                $days = collect(range(1, 6))->shuffle(); 
                 foreach ($days as $day) {
                     $timeSlots = collect(range(1, 7))->shuffle();
                     foreach ($timeSlots as $timeSlot) {
@@ -114,41 +122,56 @@ class ScheduleGeneratorService
                 }
 
                 if (!$placed) {
-                    $this->diagnoseFailure($subject, $className, $availableTeachers);
+                    // [PENYEMPURNAAN] Mengirim object $class untuk diagnosa yang lebih baik
+                    $this->diagnoseFailure($class, $subject, $className, $availableTeachers);
                 }
             }
         }
     }
 
-    private function diagnoseFailure($subject, $className, $availableTeachers)
+    /**
+     * [PENYEMPURNAAN] Logika diagnosa kegagalan sekarang lebih spesifik.
+     */
+    private function diagnoseFailure($class, $subject, $className, $availableTeachers)
     {
         $teacherNames = $availableTeachers->pluck('name')->implode(', ');
-        $isAnyTeacherEverAvailable = false;
-        
-        foreach ($availableTeachers as $teacher) {
+        $reason = "";
+
+        // Cek apakah ada guru yang tersedia sama sekali dalam seminggu
+        $isAnyTeacherEverAvailable = $availableTeachers->contains(function ($teacher) {
             for ($d = 1; $d <= 6; $d++) {
                 for ($t = 1; $t <= 7; $t++) {
                     if ($this->isTeacherAvailable($teacher->id, $d, $t)) {
-                        $isAnyTeacherEverAvailable = true;
-                        break 3;
+                        return true;
                     }
                 }
             }
-        }
+            return false;
+        });
 
         if (!$isAnyTeacherEverAvailable) {
-            $this->debugLog[] = "GAGAL: Guru yang ditugaskan ({$teacherNames}) ditandai TIDAK TERSEDIA sepanjang minggu di menu 'Ketersediaan Guru'. Aturan ini mustahil dipenuhi.";
+            $reason = "Guru yang ditugaskan ({$teacherNames}) ditandai TIDAK TERSEDIA sepanjang minggu.";
         } else {
-            $this->debugLog[] = "GAGAL: Tidak ditemukan kombinasi slot, guru, dan ruangan yang cocok untuk '{$subject->nama_pelajaran}'. Kemungkinan semua slot yang tersedia untuk guru ini sudah terisi oleh kelas lain.";
+            if ($subject->requires_special_room) {
+                 $reason = "Tidak ditemukan kombinasi slot, guru, dan Ruangan Khusus yang cocok.";
+            } else {
+                 $homeRoomName = $class->room->name ?? 'N/A';
+                 $reason = "Tidak ditemukan slot kosong di Ruangan Induk '{$homeRoomName}' yang cocok dengan jadwal guru.";
+            }
         }
-
-        $this->unplacedSubjects[] = "{$subject->nama_pelajaran} ({$className}) - Alasan: Tidak ada slot/ruangan/guru tersedia.";
+        
+        $this->debugLog[] = "GAGAL: {$reason}";
+        $this->unplacedSubjects[] = "{$subject->nama_pelajaran} ({$className}) - Alasan: {$reason}";
     }
 
+    /**
+     * [PENYEMPURNAAN] Tidak lagi melakukan query DB. Menggunakan data yang sudah di-eager load.
+     */
     private function getSubjectsForClass(Kelas $class): Collection
     {
         $subjects = new Collection();
-        foreach ($class->mataPelajarans()->withPivot('user_id')->get() as $subject) {
+        // Menggunakan relasi $class->mataPelajarans yang sudah dimuat di initialize()
+        foreach ($class->mataPelajarans as $subject) {
             for ($i = 0; $i < $subject->duration_jp; $i++) {
                 $subjects->push([
                     'subject' => $subject,
@@ -156,25 +179,39 @@ class ScheduleGeneratorService
                 ]);
             }
         }
-        return $subjects;
+        return $subjects->shuffle(); // Acak urutan mapel agar tidak monoton
     }
 
     private function tryPlaceSubject($class, $subject, $day, $timeSlot, $teachers): bool
     {
-        foreach ($teachers->shuffle() as $teacher) {
-            $availableRooms = $this->getAvailableRooms($subject);
-            foreach ($availableRooms->shuffle() as $room) {
-                if ($this->isSlotAvailable($class, $subject, $day, $timeSlot, $teacher, $room)) {
-                    $this->placeSubjectInSchedule($class, $subject, $day, $timeSlot, $teacher, $room);
+        if ($subject->requires_special_room) {
+            $specialRooms = $this->getAvailableRooms($subject);
+            foreach ($teachers->shuffle() as $teacher) {
+                foreach ($specialRooms->shuffle() as $room) {
+                    if ($this->isSlotAvailable($class, $subject, $day, $timeSlot, $teacher, $room)) {
+                        $this->placeSubjectInSchedule($class, $subject, $day, $timeSlot, $teacher, $room);
+                        return true;
+                    }
+                }
+            }
+        } else {
+            $homeRoom = $class->room;
+            foreach ($teachers->shuffle() as $teacher) {
+                if ($this->isSlotAvailable($class, $subject, $day, $timeSlot, $teacher, $homeRoom)) {
+                    $this->placeSubjectInSchedule($class, $subject, $day, $timeSlot, $teacher, $homeRoom);
                     return true;
                 }
             }
         }
+        
         return false;
     }
 
     private function isSlotAvailable($class, $subject, $day, $timeSlot, $teacher, $room): bool
     {
+        // Pengecekan null untuk room, sebagai pengaman
+        if (!$room) return false;
+
         return !$this->isBlockedTime($day, $timeSlot) &&
                $this->isTeacherAvailable($teacher->id, $day, $timeSlot) &&
                !$this->isClassBusy($class->id, $day, $timeSlot) &&
@@ -182,6 +219,8 @@ class ScheduleGeneratorService
                !$this->isRoomBusy($room->id, $day, $timeSlot) &&
                $this->isHourPriorityAllowed($subject->kategori, $day, $timeSlot);
     }
+    
+    // ... Sisa file (placeSubjectInSchedule, saveSchedule, dll) tidak ada perubahan ...
 
     private function placeSubjectInSchedule($class, $subject, $day, $timeSlot, $teacher, $room): void
     {
@@ -200,8 +239,8 @@ class ScheduleGeneratorService
     private function saveSchedule(): void
     {
         $schedules = [];
-        foreach ($this->scheduleGrid as $day => $timeSlots) {
-            foreach ($timeSlots as $timeSlot => $entries) {
+        foreach ($this->scheduleGrid as $timeSlots) {
+            foreach ($timeSlots as $entries) {
                 if (isset($entries['class'])) {
                     foreach ($entries['class'] as $scheduleData) {
                         $schedules[] = $scheduleData;
@@ -211,9 +250,7 @@ class ScheduleGeneratorService
         }
         
         if (!empty($schedules)) {
-            foreach($schedules as $schedule) {
-                Schedule::create($schedule);
-            }
+            Schedule::insert($schedules);
             $this->debugLog[] = "Jadwal berhasil dibuat dan disimpan ke database.";
         } else {
             $this->debugLog[] = "PERINGATAN: Tidak ada jadwal yang berhasil dibuat untuk disimpan.";
@@ -266,4 +303,3 @@ class ScheduleGeneratorService
         return $this->blockedTimes->where('day_of_week', $day)->where('time_slot', $timeSlot)->isNotEmpty();
     }
 }
-
